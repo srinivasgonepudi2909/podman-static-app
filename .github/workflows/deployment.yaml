@@ -19,15 +19,16 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Login to Amazon ECR
-      uses: aws-actions/amazon-ecr-login@v1
+    - name: Login to Amazon ECR using Podman
+      run: |
+        aws ecr get-login-password --region us-east-1 | podman login --username AWS --password-stdin 025066240744.dkr.ecr.us-east-1.amazonaws.com
 
-    - name: Build and Push Docker Image to ECR
+    - name: Build and Push Podman Image to ECR
       env:
         IMAGE_URI: 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
       run: |
-        docker build -t $IMAGE_URI .
-        docker push $IMAGE_URI
+        podman build -t $IMAGE_URI .
+        podman push $IMAGE_URI
 
     - name: Copy deploy.sh to EC2
       uses: appleboy/scp-action@v0.1.4
@@ -36,7 +37,7 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "deploy.sh"
-        target: "~/"  
+        target: "~/"
 
     - name: Run deploy.sh on EC2
       uses: appleboy/ssh-action@v1.0.0
