@@ -1,42 +1,67 @@
-name: Deploy Static Site to EC2 with Podman
+name: Build, Scan, and Deploy Static Site with Podman
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  deploy:
+  build-scan-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repo
+    - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Copy app & Dockerfile to EC2
-      uses: appleboy/scp-action@v0.1.4
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "Dockerfile,static"
-        target: "~/podman-static-app"
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
 
-    - name: Build and Run Container on EC2 using Podman
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build and Push Docker Image to ECR
+      env:
+        IMAGE_URI: 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
+      run: |
+        echo "Building Docker image..."
+        docker build -t $IMAGE_URI .
+        echo "Pushing Docker image to ECR..."
+        docker push $IMAGE_URI
+
+    - name: Trivy Scan of Docker Image
+      uses: aquasecurity/trivy-action@v0.13.1
+      with:
+        image-ref: 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
+        format: table
+        ignore-unfixed: true
+        vuln-type: os,library
+        severity: CRITICAL,HIGH
+        exit-code: 1
+
+    - name: Deploy to EC2 via Podman (Pull from ECR)
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }} # <- Your .pem file content here
         script: |
-          cd ~/podman-static-app
-          chmod -R a+rX .
+          sudo yum install -y amazon-ecr-credential-helper || sudo apt-get install -y amazon-ecr-credential-helper
+          export AWS_REGION=us-east-1
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-          # Build the image
-          podman build -t my-static-site:latest .
+          echo "Logging in to ECR from EC2..."
+          aws ecr get-login-password --region us-east-1 | podman login --username AWS --password-stdin 025066240744.dkr.ecr.us-east-1.amazonaws.com
 
-          # Clean up old container
+          echo "Stopping and removing old container if it exists..."
           podman stop my-static-site || true
           podman rm my-static-site || true
 
-          # Run new container
-          podman run -d --name my-static-site -p 8080:80 my-static-site:latest
+          echo "Pulling latest image from ECR..."
+          podman pull 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
+
+          echo "Running container on EC2..."
+          podman run -d --name my-static-site -p 8080:80 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
