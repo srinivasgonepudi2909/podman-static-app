@@ -1,11 +1,11 @@
-name: Build and Deploy Static Site with Podman
+name: Build, Scan, and Deploy Static Site with Podman
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  build-scan-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,27 +19,33 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-1
 
-    - name: Login to Amazon ECR using Podman
-      run: |
-        aws ecr get-login-password --region us-east-1 | podman login --username AWS --password-stdin 025066240744.dkr.ecr.us-east-1.amazonaws.com
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build and Push Podman Image to ECR
+    - name: Build and Push Docker Image to ECR
       env:
         IMAGE_URI: 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
       run: |
-        podman build -t $IMAGE_URI .
-        podman push $IMAGE_URI
-
-    - name: Run deploy.sh on EC2
+        echo "Building Docker image..."
+        docker build -t $IMAGE_URI .
+        echo "Pushing Docker image to ECR..."
+        docker push $IMAGE_URI
+    - name: Deploy to EC2 via Podman (Pull from ECR)
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd ~/podman-deploy || git clone https://github.com/${{ github.repository }} ~/podman-deploy && cd ~/podman-deploy
-          git pull origin main
-          chmod +x deploy.sh
+          export AWS_REGION=us-east-1
           export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          bash ./deploy.sh
+          echo "Logging in to ECR from EC2..."
+          aws ecr get-login-password --region us-east-1 | podman login --username AWS --password-stdin 025066240744.dkr.ecr.us-east-1.amazonaws.com
+          echo "Stopping and removing old container if it exists..."
+          podman stop my-static-site || true
+          podman rm my-static-site || true
+          echo "Pulling latest image from ECR..."
+          podman pull 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
+          echo "Running container on EC2..."
+          podman run -d --name my-static-site -p 8080:80 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
