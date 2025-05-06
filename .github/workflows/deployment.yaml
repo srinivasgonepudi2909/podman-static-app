@@ -31,13 +31,18 @@ jobs:
         podman push $IMAGE_URI
 
     - name: Copy deploy.sh to EC2
-      uses: appleboy/scp-action@v0.1.4
+      uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "deploy.sh"
         target: "~/"
+        strip_components: 0
+        overwrite: true
+        rm: true
+        tar_exec: ""  # <- most important: disables tar internally
+
 
     - name: Run deploy.sh on EC2
       uses: appleboy/ssh-action@v1.0.0
