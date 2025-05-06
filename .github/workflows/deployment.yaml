@@ -36,7 +36,7 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: "deploy.sh"
-        target: "~/deploy.sh"
+        target: "~/"  
 
     - name: Run deploy.sh on EC2
       uses: appleboy/ssh-action@v1.0.0
