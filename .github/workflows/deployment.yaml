@@ -32,7 +32,7 @@ jobs:
         docker push $IMAGE_URI
 
     - name: Trivy Scan of Docker Image
-      uses: aquasecurity/trivy-action@v0.13.1
+      uses: aquasecurity/trivy-action@v0.30.0
       with:
         image-ref: 025066240744.dkr.ecr.us-east-1.amazonaws.com/podman-static-repo:latest
         format: table
