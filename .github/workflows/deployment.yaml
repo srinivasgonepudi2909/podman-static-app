@@ -1,0 +1,42 @@
+name: Deploy Static Site to EC2 with Podman
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v3
+
+    - name: Copy app & Dockerfile to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "Dockerfile,static"
+        target: "~/podman-static-app"
+
+    - name: Build and Run Container on EC2 using Podman
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd ~/podman-static-app
+          chmod -R a+rX .
+
+          # Build the image
+          podman build -t my-static-site:latest .
+
+          # Clean up old container
+          podman stop my-static-site || true
+          podman rm my-static-site || true
+
+          # Run new container
+          podman run -d --name my-static-site -p 8080:80 my-static-site:latest
