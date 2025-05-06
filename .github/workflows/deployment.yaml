@@ -3,6 +3,7 @@ name: Build, Scan, and Deploy Static Site with Podman
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-scan-deploy:
