@@ -9,7 +9,7 @@ This repository demonstrates a CI/CD pipeline using **GitHub Actions** to:
 
 ## ✅ Requirements
 
-### 🧱 Infrastructure Prerequisites
+###  Infrastructure Prerequisites
 - An EC2 instance with:
   - **Podman** installed and configured
   - Access to pull from Amazon ECR
@@ -18,7 +18,7 @@ This repository demonstrates a CI/CD pipeline using **GitHub Actions** to:
 
 ---
 
-## 🔐 GitHub Secrets Configuration
+##  GitHub Secrets Configuration
 
 The following secrets must be added to your GitHub repository:
 
@@ -46,7 +46,7 @@ The GitHub Actions workflow performs the following:
 
 ---
 
-## 🚀 Deployment Instructions
+## Deployment Instructions
 
 1. Fork or clone this repo
 2. Update the `workflow.yaml` file with your actual ECR URI and image tag
@@ -54,5 +54,12 @@ The GitHub Actions workflow performs the following:
 
 ---
 
-## 📁 Folder Structure
+## Folder Structure
+
+├── .github
+│ └── workflows
+│ └── deploy.yaml
+├── Dockerfile
+└── static-site-content/
+
 
